@@ -59,6 +59,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
 use htmlescape::encode_minimal;
+use itertools::Itertools;
 
 use crate::query::Query;
 use crate::schema::document::{Document, Value};
@@ -117,6 +118,7 @@ pub struct Snippet {
     highlighted: Vec<Range<usize>>,
     snippet_prefix: String,
     snippet_postfix: String,
+    pub score: f32,
 }
 
 impl Snippet {
@@ -127,6 +129,7 @@ impl Snippet {
             highlighted,
             snippet_prefix: DEFAULT_SNIPPET_PREFIX.to_string(),
             snippet_postfix: DEFAULT_SNIPPET_POSTFIX.to_string(),
+            score: 0.0,
         }
     }
 
@@ -137,6 +140,7 @@ impl Snippet {
             highlighted: Vec::new(),
             snippet_prefix: String::new(),
             snippet_postfix: String::new(),
+            score: 0.0,
         }
     }
 
@@ -442,6 +446,57 @@ impl SnippetGenerator {
             self.max_num_chars,
         );
         select_best_fragment_combination(&fragment_candidates[..], text)
+    }
+
+    /// Generates a list of snippets for the given `Document`.
+    pub fn get_snippets_from_doc<D: Document>(&self, doc: &D, number_of_snippets: u16) -> Vec<Snippet> {
+        let mut text = String::new();
+        for (field, value) in doc.iter_fields_and_values() {
+            let value = value as D::Value<'_>;
+            if field != self.field {
+                continue;
+            }
+
+            if let Some(val) = value.as_str() {
+                text.push(' ');
+                text.push_str(val);
+            }
+        }
+
+        self.get_snippets(text.trim(), number_of_snippets)
+    }
+
+    /// Generates a list of snippets for the given text.
+    pub fn get_snippets(&self, text: &str, number_of_snippets: u16) -> Vec<Snippet> {
+        let fragment_candidates = search_fragments(
+            &mut self.tokenizer.clone(),
+            text,
+            &self.terms_text,
+            self.max_num_chars,
+        );
+        let mut snippets = Vec::new();
+        let sorted_fragments = fragment_candidates.iter().sorted_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(Ordering::Equal)
+                .reverse()
+        }).collect_vec();
+
+        // get the top `number_of_snippets` fragments
+        let fragment_candidates = sorted_fragments.iter().take(number_of_snippets as usize).cloned().collect_vec();
+
+        for fragment in fragment_candidates {
+            let fragment_text = &text[fragment.start_offset..fragment.stop_offset];
+            let highlighted = fragment
+                .highlighted
+                .iter()
+                .map(|item| item.start - fragment.start_offset..item.end - fragment.start_offset)
+                .collect();
+            let mut snippet = Snippet::new(fragment_text, highlighted);
+            snippet.score = fragment.score;
+            snippets.push(snippet);
+        }
+        snippets
     }
 }
 
