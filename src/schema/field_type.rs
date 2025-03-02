@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use columnar::ColumnType;
+use columnar::{ColumnType, NumericalType};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use thiserror::Error;
@@ -102,6 +102,18 @@ const ALL_TYPES: [Type; 10] = [
 ];
 
 impl Type {
+    /// Returns the numerical type if applicable
+    /// It does not do any mapping, e.g. Date is None although it's also stored as I64 in the
+    /// column store
+    pub fn numerical_type(&self) -> Option<NumericalType> {
+        match self {
+            Type::I64 => Some(NumericalType::I64),
+            Type::U64 => Some(NumericalType::U64),
+            Type::F64 => Some(NumericalType::F64),
+            _ => None,
+        }
+    }
+
     /// Returns an iterator over the different values
     /// the Type enum can tape.
     pub fn iter_values() -> impl Iterator<Item = Type> {
@@ -196,9 +208,19 @@ impl FieldType {
         }
     }
 
+    /// returns true if this is an json field
+    pub fn is_json(&self) -> bool {
+        matches!(self, FieldType::JsonObject(_))
+    }
+
     /// returns true if this is an ip address field
     pub fn is_ip_addr(&self) -> bool {
         matches!(self, FieldType::IpAddr(_))
+    }
+
+    /// returns true if this is an str field
+    pub fn is_str(&self) -> bool {
+        matches!(self, FieldType::Str(_))
     }
 
     /// returns true if this is an date field

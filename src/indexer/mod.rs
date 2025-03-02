@@ -31,7 +31,7 @@ mod stamper;
 use crossbeam_channel as channel;
 use smallvec::SmallVec;
 
-pub use self::index_writer::IndexWriter;
+pub use self::index_writer::{IndexWriter, IndexWriterOptions};
 pub use self::log_merge_policy::LogMergePolicy;
 pub use self::merge_operation::MergeOperation;
 pub use self::merge_policy::{MergeCandidate, MergePolicy, NoMergePolicy};
@@ -303,7 +303,7 @@ mod tests_mmap {
                 Type::Str,
             ),
             (format!("{field_name_out_internal}a"), Type::Str),
-            (format!("{field_name_out_internal}"), Type::Str),
+            (field_name_out_internal.to_string(), Type::Str),
             (format!("num{field_name_out_internal}"), Type::I64),
         ];
         expected_fields.sort();

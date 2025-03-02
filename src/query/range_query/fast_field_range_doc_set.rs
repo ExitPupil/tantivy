@@ -49,10 +49,10 @@ pub(crate) struct RangeDocSet<T> {
     ///
     /// There are two patterns.
     /// - We do a full scan. => We can load large chunks. We don't know in advance if seek call
-    /// will come, so we start with small chunks
+    ///   will come, so we start with small chunks
     /// - We load docs, interspersed with seek calls. When there are big jumps in the seek, we
-    /// should load small chunks. When the seeks are small, we can employ the same strategy as on a
-    /// full scan.
+    ///   should load small chunks. When the seeks are small, we can employ the same strategy as on
+    ///   a full scan.
     fetch_horizon: u32,
     /// Current batch of loaded docs.
     loaded_docs: VecCursor,
@@ -180,10 +180,12 @@ impl<T: Send + Sync + PartialOrd + Copy + Debug + 'static> DocSet for RangeDocSe
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Bound;
+
     use crate::collector::Count;
     use crate::directory::RamDirectory;
     use crate::query::RangeQuery;
-    use crate::{schema, IndexBuilder, TantivyDocument};
+    use crate::{schema, IndexBuilder, TantivyDocument, Term};
 
     #[test]
     fn range_query_fast_optional_field_minimum() {
@@ -218,10 +220,9 @@ mod tests {
         let reader = index.reader().unwrap();
         let searcher = reader.searcher();
 
-        let query = RangeQuery::new_u64_bounds(
-            "score".to_string(),
-            std::ops::Bound::Included(70),
-            std::ops::Bound::Unbounded,
+        let query = RangeQuery::new(
+            Bound::Included(Term::from_field_u64(score_field, 70)),
+            Bound::Unbounded,
         );
 
         let count = searcher.search(&query, &Count).unwrap();

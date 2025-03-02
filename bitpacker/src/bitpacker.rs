@@ -94,14 +94,14 @@ impl BitUnpacker {
 
     #[inline]
     pub fn get(&self, idx: u32, data: &[u8]) -> u64 {
-        let addr_in_bits = idx * self.num_bits;
-        let addr = (addr_in_bits >> 3) as usize;
+        let addr_in_bits = idx as usize * self.num_bits as usize;
+        let addr = addr_in_bits >> 3;
         if addr + 8 > data.len() {
             if self.num_bits == 0 {
                 return 0;
             }
             let bit_shift = addr_in_bits & 7;
-            return self.get_slow_path(addr, bit_shift, data);
+            return self.get_slow_path(addr, bit_shift as u32, data);
         }
         let bit_shift = addr_in_bits & 7;
         let bytes: [u8; 8] = (&data[addr..addr + 8]).try_into().unwrap();
@@ -368,9 +368,9 @@ mod test {
                 for start_idx in 0u32..32u32 {
                     output.resize(len, 0);
                     bitunpacker.get_batch_u32s(start_idx, &buffer, &mut output);
-                    for i in 0..len {
+                    for (i, output_byte) in output.iter().enumerate() {
                         let expected = (start_idx + i as u32) & mask;
-                        assert_eq!(output[i], expected);
+                        assert_eq!(*output_byte, expected);
                     }
                 }
             }
