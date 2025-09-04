@@ -1164,7 +1164,7 @@ mod tests {
             comparable_docs.truncate(limit);
             prop_assert_eq!(
                 computer.into_sorted_vec(),
-                comparable_docs,
+                comparable_docs
             );
         }
 
@@ -1182,7 +1182,7 @@ mod tests {
             comparable_docs.truncate(limit);
             prop_assert_eq!(
                 computer.into_sorted_vec(),
-                comparable_docs,
+                comparable_docs
             );
         }
     }
