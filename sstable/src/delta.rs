@@ -2,10 +2,11 @@ use std::io::{self, BufWriter, Write};
 use std::ops::Range;
 
 use common::{CountingWriter, OwnedBytes};
+#[cfg(feature = "zstd-compression")]
 use zstd::bulk::Compressor;
 
 use super::value::ValueWriter;
-use super::{value, vint, BlockReader};
+use super::{BlockReader, value, vint};
 
 const FOUR_BIT_LIMITS: usize = 1 << 4;
 const VINT_MODE: u8 = 1u8;
@@ -53,25 +54,28 @@ where
 
         let block_len = buffer.len() + self.block.len();
 
-        if block_len > 2048 {
-            buffer.extend_from_slice(&self.block);
-            self.block.clear();
+        if cfg!(feature = "zstd-compression") && block_len > 2048 {
+            #[cfg(feature = "zstd-compression")]
+            {
+                buffer.extend_from_slice(&self.block);
+                self.block.clear();
 
-            let max_len = zstd::zstd_safe::compress_bound(buffer.len());
-            self.block.reserve(max_len);
-            Compressor::new(3)?.compress_to_buffer(buffer, &mut self.block)?;
+                let max_len = zstd::zstd_safe::compress_bound(buffer.len());
+                self.block.reserve(max_len);
+                Compressor::new(3)?.compress_to_buffer(buffer, &mut self.block)?;
 
-            // verify compression had a positive impact
-            if self.block.len() < buffer.len() {
-                self.write
-                    .write_all(&(self.block.len() as u32 + 1).to_le_bytes())?;
-                self.write.write_all(&[1])?;
-                self.write.write_all(&self.block[..])?;
-            } else {
-                self.write
-                    .write_all(&(block_len as u32 + 1).to_le_bytes())?;
-                self.write.write_all(&[0])?;
-                self.write.write_all(&buffer[..])?;
+                // verify compression had a positive impact
+                if self.block.len() < buffer.len() {
+                    self.write
+                        .write_all(&(self.block.len() as u32 + 1).to_le_bytes())?;
+                    self.write.write_all(&[1])?;
+                    self.write.write_all(&self.block[..])?;
+                } else {
+                    self.write
+                        .write_all(&(block_len as u32 + 1).to_le_bytes())?;
+                    self.write.write_all(&[0])?;
+                    self.write.write_all(&buffer[..])?;
+                }
             }
         } else {
             self.write
@@ -89,7 +93,7 @@ where
 
     fn encode_keep_add(&mut self, keep_len: usize, add_len: usize) {
         if keep_len < FOUR_BIT_LIMITS && add_len < FOUR_BIT_LIMITS {
-            let b = (keep_len | add_len << 4) as u8;
+            let b = (keep_len | (add_len << 4)) as u8;
             self.block.extend_from_slice(&[b])
         } else {
             let mut buf = [VINT_MODE; 20];

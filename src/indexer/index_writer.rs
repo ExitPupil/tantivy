@@ -370,7 +370,7 @@ impl<D: Document> IndexWriter<D> {
             .map_err(|_| error_in_index_worker_thread("Failed to join merging thread."));
 
         if let Err(ref e) = result {
-            error!("Some merging thread failed {:?}", e);
+            error!("Some merging thread failed {e:?}");
         }
 
         result
@@ -644,7 +644,7 @@ impl<D: Document> IndexWriter<D> {
 
         let commit_opstamp = self.stamper.stamp();
         let prepared_commit = PreparedCommit::new(self, commit_opstamp);
-        info!("Prepared commit {}", commit_opstamp);
+        info!("Prepared commit {commit_opstamp}");
         Ok(prepared_commit)
     }
 
@@ -2553,7 +2553,7 @@ mod tests {
     #[test]
     fn test_writer_options_validation() {
         let mut schema_builder = Schema::builder();
-        let field = schema_builder.add_bool_field("example", STORED);
+        let _field = schema_builder.add_bool_field("example", STORED);
         let index = Index::create_in_ram(schema_builder.build());
 
         let opt_wo_threads = IndexWriterOptions::builder().num_worker_threads(0).build();
